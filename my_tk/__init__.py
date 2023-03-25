@@ -1,0 +1,1 @@
+print('somthing imported from my_tk')
