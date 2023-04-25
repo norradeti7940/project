@@ -10,10 +10,10 @@ from my_util.util import limit_concurrency
 
 class Scrollbar(tk.Frame):
 
-    def __init__(self,*args, command=None, width=15, height=15, orient='vertical', modifier='' , **kwargs) -> None:
+    def __init__(self,*args, command=None, width=15, height=15, orient='vertical', modifier='', ipad=(0,0,0), icpad=2 , increase_btn_size=(15,15), decrease_btn_size=(15,15), sb_width=5, **kwargs) -> None:
         super().__init__(*args, width= width, height=height, **kwargs)
-        sb = tk.Scale(self, showvalue=False, bg='red', highlightthickness=0, troughcolor=self['bg'], borderwidth=0, width=5, sliderlength=60, sliderrelief='flat', command=command)
-        decrease_btn = tk.Button(self,anchor='n',  font='-size 8', borderwidth=0, command= lambda: sb.set(value = sb.get()-1), repeatdelay=sb['repeatdelay'], repeatinterval=sb['repeatinterval'])
+        sb = tk.Scale(self, showvalue=False, bg='red', highlightthickness=0, troughcolor=self['bg'], borderwidth=0, width=sb_width, sliderlength=60, sliderrelief='flat', command=command)
+        decrease_btn = tk.Button(self,anchor='n',  font='-size 8', borderwidth=0, command=lambda: sb.set(value = sb.get()-1), repeatdelay=sb['repeatdelay'], repeatinterval=sb['repeatinterval'])
         increase_btn = tk.Button(self,anchor='s', font='-size 8', borderwidth=0, command=lambda: sb.set(sb.get()+1), repeatdelay=sb['repeatdelay'], repeatinterval=sb['repeatinterval'])
         self.wheel_tag= 'weel tag of ' + self._w
         self.internal_whell_tag= internal_class_tag= 'internal wheel tag of ' + self._w
@@ -26,6 +26,12 @@ class Scrollbar(tk.Frame):
         self.modifier = modifier
         self.decrease_btn = decrease_btn
         self.increase_btn = increase_btn
+        self.decrease_btn_size = decrease_btn_size
+        self.increase_btn_size = increase_btn_size
+        if isinstance(ipad,int):
+            ipad= (ipad,)*3
+        self.ipad = ipad
+        self.icpad = icpad
         self.__set_orient(orient)
 
     def bind_external_mousewheel(self):
@@ -40,15 +46,15 @@ class Scrollbar(tk.Frame):
         if orient == 'vertical':
             self.decrease_btn.config(text=' △', font= '-size 8 -weight normal', anchor='center')#▲  -weight bold
             self.increase_btn.config(text=' ▽', font= '-size 8 -weight normal', anchor='center')#▼
-            self.decrease_btn.place(anchor='nw', height=15, width=15)
-            self.increase_btn.place(anchor='sw', height=15, width=15, rely=1)
-            self.sb.place(anchor='w', x=5, rely=0.5, width=5)#, height=self.winfo_height()-34)
+            self.decrease_btn.place(anchor='nw', x=self.ipad[0], y=self.ipad[1], height=self.decrease_btn_size[1], width=self.decrease_btn_size[0])
+            self.increase_btn.place(anchor='sw', x=self.ipad[0], y=-self.ipad[2], height=self.increase_btn_size[1], width=self.increase_btn_size[0], rely=1)
+            self.sb.place(anchor='w', x=5+self.ipad[0], rely=0.5, width=5)#, height=self.winfo_height()-34)
         else:
             self.decrease_btn.config(text='◁', font= '-weight normal', anchor='center')#◀-size 8 
             self.increase_btn.config(text='▷', font= '-weight normal', anchor='center')#▶-size 8
-            self.decrease_btn.place(y=0, height=15, width=15)#anchor='nw',
-            self.increase_btn.place(anchor='ne', y=0, height=15, width=15, relx=1)
-            self.sb.place(anchor='n', y=5, relx=0.5)#, height=5, width=self.winfo_width()-34)
+            self.decrease_btn.place(anchor='nw', y=self.ipad[0], x=self.ipad[1], height=15, width=15)#anchor='nw',
+            self.increase_btn.place(anchor='ne', y=self.ipad[0], x=-self.ipad[2], height=15, width=15, relx=1)
+            self.sb.place(anchor='n', y=5+self.ipad[0], relx=0.5)#, height=5, width=self.winfo_width()-34)
 
     def configure(self, cnf : dict[str,Any]=None, *args: Any, **kwds: Any) -> Any:
         if cnf:
@@ -84,9 +90,8 @@ class Scrollbar(tk.Frame):
                     else:
                         self.sb.update()
                         if self.sb['orient']=='vertical':
-                            self.sb.config(sliderlength= int(v * self.sb.winfo_height()))
+                            self.sb.config(sliderlength= v * self.sb.winfo_height())
                         else:
-                            #self.sb.config(sliderlength= int(v * self.sb.winfo_width()))
                             self.sb.config(sliderlength= v * self.sb.winfo_width())
                     kwds.pop(k)
                 case 'to':
@@ -95,6 +100,9 @@ class Scrollbar(tk.Frame):
                     kwds.pop(k)
                 case 'from_':
                     self.sb.config(from_ = v)
+                    kwds.pop(k)
+                case 'orient':
+                    self.__set_orient(orient = v)
                     kwds.pop(k)
         super().configure(*args,**kwds)
     
@@ -143,9 +151,9 @@ class Scrollbar(tk.Frame):
     def __update_sb(self):
         self.update_idletasks()
         if self.sb['orient'] == 'vertical':
-            self.sb.place(height= self.winfo_height()-34)
+            self.sb.place(height= self.winfo_height()-self.ipad[1]-self.ipad[2]-self.icpad*2)
         else:
-            self.sb.place(width= self.winfo_width()-34)
+            self.sb.place(width= self.winfo_width()-self.ipad[1]-self.ipad[2]-self.icpad*2)
     
     def set_color_t(self, t: dft_theme):
         self['bg']=t.bg_color
@@ -171,10 +179,11 @@ class Scrollframe(tk.Frame):
 
     __prev_dimension = [0,0]
 
-    def __init__(self, master : tk.Misc= None, smaller : list[bool,bool]= [False, False], wall_offset : list = [20, 20], **kwargs) -> None:
+    #(n,s,w,e)
+    def __init__(self, master : tk.Misc= None, smaller : list[bool,bool]= [False, False], wall_offset :  int | list[int] | tuple[int] = 20, sbx_wall_offset : int | list[int] | tuple[int] = 2, sby_wall_offset : int | list[int] | tuple[int] = 2, **kwargs) -> None:
         self.smaller = smaller
-        self.wall_offset = wall_offset
-
+        wall_offset = self.__format_arg(wall_offset, 'wall offset')
+        self.wall_offset = wall_offset 
         super().__init__(master, **kwargs)
         self.visible_area_frame= visible_area_frame = self
         
@@ -182,16 +191,16 @@ class Scrollframe(tk.Frame):
             if smaller[1]:
                 kwargs.pop('width')
             else:
-                kwargs['width'] = max(0,kwargs['width']-wall_offset[0] * 2)
+                kwargs['width'] = max(0,kwargs['width'] - wall_offset[0] - wall_offset[1])
         if 'height' in kwargs:
             if smaller[0]:
                 kwargs.pop('height')
             else:
-                kwargs['height'] = max(0,kwargs['height']-wall_offset[1] * 2)
+                kwargs['height'] = max(0,kwargs['height'] - wall_offset[2] - wall_offset[3])
 
         main_frame= tk.Frame(visible_area_frame, cnf= kwargs)
         self.main_frame = main_frame
-        main_frame.place(x= wall_offset[0], y= wall_offset[1])
+        main_frame.place(x= wall_offset[0], y= wall_offset[2])
         self.CHILD_BINDTAG= child_binding = 'child of ' + main_frame._w
         self.bind('<Configure>', self.__set_scrollbar_visibility)
         main_frame.bind('<Configure>', self.__set_scrollbar_visibility)
@@ -200,12 +209,26 @@ class Scrollframe(tk.Frame):
         main_frame.bind_class(child_binding, '<Configure>', self.__resize_frame)
         main_frame.bind_class(child_binding, '<Unmap>', self.__resize_frame)
 
-        scrollbar_y = Scrollbar(visible_area_frame, command= lambda x: main_frame.place(y = self.wall_offset[1] - int(x)))
-        scrollbar_x = Scrollbar(visible_area_frame, orient= 'horizontal', modifier='Control-', command= lambda x: main_frame.place(x = self.wall_offset[0] - int(x)))
+        scrollbar_y = Scrollbar(visible_area_frame, ipad=(0,2,2), width=17, command= lambda x: main_frame.place(y = self.wall_offset[2] - int(x)))
+        scrollbar_x = Scrollbar(visible_area_frame, ipad=(0,2,2), height=17, orient= 'horizontal', modifier='Control-', command= lambda x: main_frame.place(x = self.wall_offset[0] - int(x)))
         main_frame.bindtags(main_frame.bindtags() + (scrollbar_y.wheel_tag,scrollbar_x.wheel_tag))
         self.scrollbar_y = scrollbar_y
         self.scrollbar_x = scrollbar_x
 
+    def __format_arg(self, arg, name):
+        if isinstance(arg, int):
+            return (arg,)*4
+        print('a',arg)
+        match len(arg):
+            case 1:
+                return arg*4
+            case 2:
+                return (arg[0],arg[0],arg[1],arg[1])
+            case 4:
+                return arg
+            case _:
+                raise ValueError(f'{name} should be: an int or a tuple/list whith length 1(same parameter for all direction), 2(first for n, s and second for w, e), 4(for n, s, w, e)')
+            
     def __tag_as_child(self, e: tk.Event):
         w: tk.Widget = e.widget
         if w == self.main_frame:
@@ -219,14 +242,14 @@ class Scrollframe(tk.Frame):
         w: tk.Widget = e.widget
         width= w.winfo_x() + w.winfo_width()
         height = w.winfo_y() + w.winfo_height()
-        minx = self.winfo_width() - self.wall_offset[0] * 2 if not self.smaller[0] else 0
-        miny = self.winfo_height() - self.wall_offset[1] * 2 if not self.smaller[1] else 0
+        minx = self.winfo_width() - self.wall_offset[0] - self.wall_offset[1] if not self.smaller[0] else 0
+        miny = self.winfo_height() - self.wall_offset[2] - self.wall_offset[3] if not self.smaller[1] else 0
         self.main_frame.update()
         self.main_frame.place(width= max(minx, width, self.main_frame.winfo_width()), height= max(miny, height, self.main_frame.winfo_height()))
 
     def __resize_frame(self, *_):
-        minx = self.winfo_width() - self.wall_offset[0] * 2 if not self.smaller[0] else 0
-        miny = self.winfo_height() - self.wall_offset[1] * 2 if not self.smaller[1] else 0
+        minx = self.winfo_width() - self.wall_offset[0] - self.wall_offset[1] if not self.smaller[0] else 0
+        miny = self.winfo_height() - self.wall_offset[2] - self.wall_offset[3] if not self.smaller[1] else 0
         width, height = 0, 0
         for w in self.main_frame.winfo_children():
             if w.winfo_ismapped():
@@ -240,23 +263,15 @@ class Scrollframe(tk.Frame):
             return
         self.__prev_dimension[0] = e.width
         self.__prev_dimension[1] = e.height
-        max_height= self.winfo_height() - self.wall_offset[1] * 2
-        max_width= self.winfo_width() - self.wall_offset[0] * 2
+        max_height= self.winfo_height() - self.wall_offset[2] - self.wall_offset[3]
+        max_width= self.winfo_width() - self.wall_offset[0] - self.wall_offset[1]
         c_height= self.main_frame.winfo_height()
         c_width= self.main_frame.winfo_width()
         if c_height > max_height:
             if not self.scrollbar_y.winfo_ismapped():
-                """if not self.scrollbar_x.winfo_ismapped():
-                    self.scrollbar_y.place(anchor='ne', relx=1 , x=-2, y=2, height=self.winfo_height()-4)
-                else:
-                    self.scrollbar_x.place(width = self.scrollbar_x.winfo_width()-17)
-                    self.scrollbar_y.place(anchor='ne', relx=1 , x=-2, y=2, height=self.winfo_height()-21)"""
                 if self.scrollbar_x.winfo_ismapped():
                     self.scrollbar_x.place(width = self.scrollbar_x.winfo_width()-17)
-                a=tk.Frame(self, bg='red')
-                a.place(anchor='ne', relx=1, width= 17 , relheight=1)
-                a.lower(self.scrollbar_y)
-                self.scrollbar_y.place(anchor='ne', relx=1 , x=-2, y=2, height=self.winfo_height()-4)
+                self.scrollbar_y.place(anchor='ne', relx=1, height=self.winfo_height())#x=-2, y=2, height=self.winfo_height()-4
                 self.__tag_mf_child(self.scrollbar_y.wheel_tag)
                 self.scrollbar_y.bind_external_mousewheel()
             self.scrollbar_y['to'] = c_height - max_height
@@ -269,12 +284,9 @@ class Scrollframe(tk.Frame):
         if c_width > max_width:
             if not self.scrollbar_x.winfo_ismapped():
                 if not self.scrollbar_y.winfo_ismapped():
-                    self.scrollbar_x.place(anchor='sw', rely=1 , x=2, y=-2, width=self.winfo_width()-4)
+                    self.scrollbar_x.place(anchor='sw', rely=1, width=self.winfo_width())#, x=2, y=-2, width=self.winfo_width()-4
                 else:
-                    self.scrollbar_x.place(anchor='sw', rely=1 , x=2, y=-2, width=self.winfo_width()-21)
-                """else:
-                    self.scrollbar_y.place(height= self.scrollbar_y.winfo_height()-17)
-                    self.scrollbar_x.place(anchor='sw', rely=1 , x=2, y=-2, width=self.winfo_width()-21)"""
+                    self.scrollbar_x.place(anchor='sw', rely=1, width=self.winfo_width()-17)#, x=2, y=-2, width=self.winfo_width()-21
                 self.__tag_mf_child(self.scrollbar_x.wheel_tag)
                 self.scrollbar_x.bind_external_mousewheel()
             self.scrollbar_x['to'] = c_width - max_width
@@ -282,9 +294,7 @@ class Scrollframe(tk.Frame):
             self.scrollbar_x['sliderlength'] = max_width/c_width
         elif self.scrollbar_x.winfo_ismapped():
             self.scrollbar_x.place_forget()
-            self.scrollbar_x.unbind_external_mousewheel ()
-            """if self.scrollbar_y.winfo_ismapped():
-                self.scrollbar_y.place(height= self.scrollbar_y.winfo_height()+17)"""
+            self.scrollbar_x.unbind_external_mousewheel()
             
     def __tag_mf_child(self, tag: str, widget: tk.Widget = None):
         if not widget:
